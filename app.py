@@ -2,23 +2,138 @@ import streamlit as st
 import json
 import os
 from datetime import datetime
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 import pandas as pd
+import re
 
 # Page config
 st.set_page_config(
-    page_title="Super Bowl Prop Picks",
+    page_title="Super Bowl LX Prop Picks",
     page_icon="🏈",
     layout="wide"
 )
 
-# Data file
+# Data files
 DATA_FILE = "picks.json"
 RESULTS_FILE = "results.json"
+QUESTIONS_FILE = "Super Bowl LX Picks.xlsx"
 
 # Initialize session state
 if "submitted" not in st.session_state:
     st.session_state.submitted = False
+if "questions" not in st.session_state:
+    st.session_state.questions = None
+
+def load_questions() -> List[Dict]:
+    """Load questions from Excel file"""
+    if st.session_state.questions is not None:
+        return st.session_state.questions
+    
+    try:
+        df = pd.read_excel(QUESTIONS_FILE)
+        
+        # Exclude metadata columns
+        exclude_cols = [
+            'Timestamp', 
+            'Email Address', 
+            'Name',
+            'Would you like to opt-in for $20 SUPER BOWL POOL - Half of winnings go to charity of winner\'s choice and other half in their pocker.  Send a $20 Venmo to @john-deely-67',
+            'Did you Venmo $20 to @john-deely-67',
+            'For auditing purposes, what is your Venmo handle? (Please include @ in the handle or just Venmo me)',
+            'If you win, what is your charity of choice? (Please don\'t say "idk" like Aaron Black)'
+        ]
+        
+        questions = []
+        for col in df.columns:
+            if col not in exclude_cols:
+                q_type, options = determine_question_type(col)
+                questions.append({
+                    'key': col,
+                    'text': col,
+                    'type': q_type,
+                    'options': options,
+                    'required': 'TIE BREAKER' not in col.upper()  # Tie breaker is optional
+                })
+        
+        st.session_state.questions = questions
+        return questions
+    except Exception as e:
+        st.error(f"Error loading questions: {str(e)}")
+        return []
+
+def determine_question_type(question_text: str) -> Tuple[str, List]:
+    """Determine question type and options based on question text"""
+    q_lower = question_text.lower()
+    
+    # Over/Under questions
+    if 'over/under' in q_lower:
+        # Extract the number
+        match = re.search(r'over/under\s+([\d.]+)', q_lower)
+        if match:
+            threshold = float(match.group(1))
+            return 'over_under', [threshold]
+        return 'over_under', [0]
+    
+    # Yes/No questions
+    if q_lower.startswith('will ') or 'will ' in q_lower:
+        return 'yes_no', []
+    
+    # Heads or Tails
+    if 'heads or tails' in q_lower or 'heads/tails' in q_lower:
+        return 'select', ['Heads', 'Tails']
+    
+    # Even or Odd
+    if 'even or odd' in q_lower:
+        return 'select', ['Even', 'Odd']
+    
+    # Up or Down
+    if 'up or down' in q_lower:
+        return 'select', ['Up', 'Down']
+    
+    # Multiple choice with "or"
+    if ' or ' in question_text and not 'over/under' in q_lower:
+        # Try to extract options
+        parts = question_text.split(' or ')
+        if len(parts) == 2:
+            # Clean up the options
+            opt1 = parts[0].split(':')[-1].strip() if ':' in parts[0] else parts[0].strip()
+            opt2 = parts[1].split('?')[0].strip() if '?' in parts[1] else parts[1].strip()
+            # Remove common prefixes
+            opt1 = re.sub(r'^(which|who|what|more|first)\s+', '', opt1, flags=re.IGNORECASE).strip()
+            opt2 = re.sub(r'^(which|who|what|more|first)\s+', '', opt2, flags=re.IGNORECASE).strip()
+            if opt1 and opt2:
+                return 'select', [opt1, opt2]
+    
+    # Gatorade color
+    if 'gatorade' in q_lower and 'color' in q_lower:
+        return 'select', ['Orange', 'Yellow', 'Green', 'Blue', 'Purple', 'Red', 'Clear/Water', 'None']
+    
+    # First play type
+    if 'first play' in q_lower and ('run' in q_lower or 'pass' in q_lower):
+        return 'select', ['Run', 'Pass/Sack']
+    
+    # Turnover type
+    if 'first turnover' in q_lower:
+        return 'select', ['Fumble', 'Interception', 'Turnover on Downs', 'None']
+    
+    # Car commercial type
+    if 'car commercial' in q_lower:
+        return 'select', ['Gas', 'Electric', 'Hybrid']
+    
+    # Pharmaceutical commercial
+    if 'pharmaceutical' in q_lower:
+        return 'select', ['Weight Loss/Diabetes', 'Other']
+    
+    # Coach selection (for National Anthem)
+    if 'coach' in q_lower and 'national anthem' in q_lower:
+        return 'select', ['Seattle Seahawks Coach', 'New England Patriots Coach']
+    
+    # Coin toss winner
+    if 'who wins coin toss' in q_lower:
+        return 'select', ['Seattle Seahawks', 'New England Patriots']
+    
+    # Default to text input
+    return 'text', []
 
 def load_picks() -> List[Dict]:
     """Load picks from JSON file"""
@@ -44,36 +159,109 @@ def save_results(results: Dict):
     with open(RESULTS_FILE, 'w') as f:
         json.dump(results, f, indent=2)
 
-def calculate_score(picks: Dict, results: Dict) -> int:
+def calculate_score(picks: Dict, results: Dict, questions: List[Dict]) -> int:
     """Calculate score based on picks vs results"""
     if not results:
         return 0
     
     score = 0
-    points = {
-        'winner': 10,
-        'total_points': 10,
-        'mvp': 10,
-        'first_touchdown': 5,
-        'coin_toss': 3,
-        'national_anthem_duration': 5,
-        'first_commercial_category': 3,
-        'halftime_performer_song': 3,
-        'gatorade_color': 5,
-        'first_score_type': 5
-    }
+    base_points = 5  # Default points per question
     
-    # Check each pick
-    for key, points_value in points.items():
-        if key in picks and key in results:
-            if picks[key] == results[key]:
-                score += points_value
+    for question in questions:
+        q_key = question['key']
+        q_type = question['type']
+        
+        if q_key not in picks or q_key not in results:
+            continue
+        
+        pick_value = picks[q_key]
+        result_value = results[q_key]
+        
+        if pick_value is None or result_value is None:
+            continue
+        
+        # Handle different question types
+        if q_type == 'over_under':
+            # For over/under, check if pick matches result (Over/Under)
+            if pick_value == result_value:
+                score += base_points
+        elif q_type == 'yes_no':
+            # Yes/No questions
+            if str(pick_value).lower() == str(result_value).lower():
+                score += base_points
+        elif q_type == 'select':
+            # Multiple choice
+            if str(pick_value).strip().lower() == str(result_value).strip().lower():
+                score += base_points
+        elif q_type == 'text':
+            # Text input - exact match (case insensitive)
+            if str(pick_value).strip().lower() == str(result_value).strip().lower():
+                score += base_points
+        elif q_type == 'number':
+            # Number input - exact match
+            try:
+                if float(pick_value) == float(result_value):
+                    score += base_points
+            except:
+                pass
     
     return score
 
+def render_question_input(question: Dict, key_prefix: str = ""):
+    """Render appropriate input widget for a question"""
+    q_key = question['key']
+    q_text = question['text']
+    q_type = question['type']
+    q_options = question['options']
+    q_required = question.get('required', True)
+    
+    full_key = f"{key_prefix}_{q_key}" if key_prefix else q_key
+    
+    if q_type == 'over_under':
+        threshold = q_options[0] if q_options else 0
+        return st.selectbox(
+            f"{q_text} *" if q_required else q_text,
+            ["", "Over", "Under"],
+            key=full_key
+        )
+    elif q_type == 'yes_no':
+        return st.selectbox(
+            f"{q_text} *" if q_required else q_text,
+            ["", "Yes", "No"],
+            key=full_key
+        )
+    elif q_type == 'select':
+        options = [""] + q_options
+        return st.selectbox(
+            f"{q_text} *" if q_required else q_text,
+            options,
+            key=full_key
+        )
+    elif q_type == 'number':
+        return st.number_input(
+            f"{q_text} *" if q_required else q_text,
+            min_value=0.0,
+            value=0.0,
+            step=0.1,
+            key=full_key
+        )
+    else:  # text
+        return st.text_input(
+            f"{q_text} *" if q_required else q_text,
+            key=full_key,
+            placeholder="Enter your answer"
+        )
+
 def main():
-    st.title("🏈 Super Bowl Prop Picks")
+    st.title("🏈 Super Bowl LX Prop Picks")
     st.markdown("---")
+    
+    # Load questions
+    questions = load_questions()
+    
+    if not questions:
+        st.error("Could not load questions from Excel file. Please ensure 'Super Bowl LX Picks.xlsx' is in the same directory.")
+        return
     
     # Sidebar for admin (results entry)
     with st.sidebar:
@@ -82,41 +270,62 @@ def main():
             st.subheader("Enter Actual Results")
             results = load_results()
             
-            winner = st.selectbox("Winner", ["", "Kansas City Chiefs", "San Francisco 49ers"], 
-                                index=0 if not results.get('winner') else (1 if results.get('winner') == "Kansas City Chiefs" else 2))
-            total_points = st.number_input("Total Points", min_value=0, value=results.get('total_points', 0))
-            mvp = st.text_input("MVP", value=results.get('mvp', ''))
-            first_touchdown = st.text_input("First Touchdown Scorer", value=results.get('first_touchdown', ''))
-            coin_toss = st.selectbox("Coin Toss", ["", "Heads", "Tails"], 
-                                    index=0 if not results.get('coin_toss') else (1 if results.get('coin_toss') == "Heads" else 2))
-            national_anthem_duration = st.number_input("National Anthem Duration (seconds)", 
-                                                      min_value=0.0, value=results.get('national_anthem_duration', 0.0), step=0.1)
-            first_commercial_category = st.text_input("First Commercial Category", value=results.get('first_commercial_category', ''))
-            halftime_performer_song = st.text_input("Halftime Performer First Song", value=results.get('halftime_performer_song', ''))
-            gatorade_color = st.selectbox("Gatorade Shower Color", 
-                                        ["", "Orange", "Yellow", "Green", "Blue", "Purple", "Red", "Clear/Water"],
-                                        index=0 if not results.get('gatorade_color') else 
-                                        ["", "Orange", "Yellow", "Green", "Blue", "Purple", "Red", "Clear/Water"].index(results.get('gatorade_color', '')))
-            first_score_type = st.selectbox("First Score Type", 
-                                           ["", "Touchdown", "Field Goal", "Safety"],
-                                           index=0 if not results.get('first_score_type') else 
-                                           ["", "Touchdown", "Field Goal", "Safety"].index(results.get('first_score_type', '')))
+            result_inputs = {}
+            for question in questions:
+                q_key = question['key']
+                q_text = question['text']
+                q_type = question['type']
+                q_options = question['options']
+                
+                current_value = results.get(q_key, "")
+                
+                if q_type == 'over_under':
+                    threshold = q_options[0] if q_options else 0
+                    result_inputs[q_key] = st.selectbox(
+                        q_text,
+                        ["", "Over", "Under"],
+                        index=0 if not current_value else (1 if current_value == "Over" else 2),
+                        key=f"result_{q_key}"
+                    )
+                elif q_type == 'yes_no':
+                    result_inputs[q_key] = st.selectbox(
+                        q_text,
+                        ["", "Yes", "No"],
+                        index=0 if not current_value else (1 if current_value == "Yes" else 2),
+                        key=f"result_{q_key}"
+                    )
+                elif q_type == 'select':
+                    options = [""] + q_options
+                    try:
+                        idx = options.index(current_value) if current_value else 0
+                    except:
+                        idx = 0
+                    result_inputs[q_key] = st.selectbox(
+                        q_text,
+                        options,
+                        index=idx,
+                        key=f"result_{q_key}"
+                    )
+                elif q_type == 'number':
+                    result_inputs[q_key] = st.number_input(
+                        q_text,
+                        min_value=0.0,
+                        value=float(current_value) if current_value else 0.0,
+                        step=0.1,
+                        key=f"result_{q_key}"
+                    )
+                else:  # text
+                    result_inputs[q_key] = st.text_input(
+                        q_text,
+                        value=current_value if current_value else "",
+                        key=f"result_{q_key}"
+                    )
             
             if st.button("Save Results"):
-                new_results = {
-                    'winner': winner if winner else None,
-                    'total_points': int(total_points) if total_points else None,
-                    'mvp': mvp if mvp else None,
-                    'first_touchdown': first_touchdown if first_touchdown else None,
-                    'coin_toss': coin_toss if coin_toss else None,
-                    'national_anthem_duration': float(national_anthem_duration) if national_anthem_duration else None,
-                    'first_commercial_category': first_commercial_category if first_commercial_category else None,
-                    'halftime_performer_song': halftime_performer_song if halftime_performer_song else None,
-                    'gatorade_color': gatorade_color if gatorade_color else None,
-                    'first_score_type': first_score_type if first_score_type else None,
-                    'updated_at': datetime.now().isoformat()
-                }
-                save_results(new_results)
+                # Clean up empty values
+                cleaned_results = {k: v if v != "" else None for k, v in result_inputs.items()}
+                cleaned_results['updated_at'] = datetime.now().isoformat()
+                save_results(cleaned_results)
                 st.success("Results saved!")
                 st.rerun()
     
@@ -131,71 +340,84 @@ def main():
             
             with col1:
                 name = st.text_input("Your Name *", placeholder="Enter your name")
+            with col2:
                 email = st.text_input("Email *", placeholder="your.email@example.com")
             
-            st.markdown("### Game Props")
+            st.markdown("### Prop Questions")
+            st.markdown("Please answer all questions. Questions marked with * are required.")
             
-            col1, col2 = st.columns(2)
-            with col1:
-                winner = st.selectbox("Winner *", ["", "Kansas City Chiefs", "San Francisco 49ers"])
-                total_points = st.number_input("Total Points *", min_value=0, value=50, step=1)
-                mvp = st.text_input("MVP *", placeholder="Player name")
-                first_touchdown = st.text_input("First Touchdown Scorer", placeholder="Player name")
+            # Group questions into sections for better organization
+            game_questions = [q for q in questions if any(word in q['text'].lower() for word in ['game', 'points', 'coin', 'play', 'touchdown', 'turnover', 'penalty', 'field goal', 'conversion', 'pass', 'run', 'tackle', 'reception', 'rushing', 'passing', 'jersey'])]
+            commercial_questions = [q for q in questions if 'commercial' in q['text'].lower()]
+            halftime_questions = [q for q in questions if any(word in q['text'].lower() for word in ['halftime', 'kendrick', 'lamar', 'song'])]
+            anthem_questions = [q for q in questions if 'anthem' in q['text'].lower()]
+            other_questions = [q for q in questions if q not in game_questions and q not in commercial_questions and q not in halftime_questions and q not in anthem_questions]
             
-            with col2:
-                coin_toss = st.selectbox("Coin Toss", ["", "Heads", "Tails"])
-                first_score_type = st.selectbox("First Score Type", ["", "Touchdown", "Field Goal", "Safety"])
-                gatorade_color = st.selectbox("Gatorade Shower Color", 
-                                            ["", "Orange", "Yellow", "Green", "Blue", "Purple", "Red", "Clear/Water"])
+            pick_inputs = {}
             
-            st.markdown("### Entertainment Props")
+            if game_questions:
+                st.markdown("#### 🏈 Game Props")
+                for question in game_questions:
+                    pick_inputs[question['key']] = render_question_input(question, "pick")
             
-            col1, col2 = st.columns(2)
-            with col1:
-                national_anthem_duration = st.number_input("National Anthem Duration (seconds)", 
-                                                          min_value=0.0, value=120.0, step=0.1)
-                first_commercial_category = st.text_input("First Commercial Category", 
-                                                         placeholder="e.g., Beer, Car, Insurance")
+            if anthem_questions:
+                st.markdown("#### 🎤 National Anthem Props")
+                for question in anthem_questions:
+                    pick_inputs[question['key']] = render_question_input(question, "pick")
             
-            with col2:
-                halftime_performer_song = st.text_input("Halftime Performer First Song", 
-                                                       placeholder="Song name")
+            if commercial_questions:
+                st.markdown("#### 📺 Commercial Props")
+                for question in commercial_questions:
+                    pick_inputs[question['key']] = render_question_input(question, "pick")
+            
+            if halftime_questions:
+                st.markdown("#### 🎵 Halftime Show Props")
+                for question in halftime_questions:
+                    pick_inputs[question['key']] = render_question_input(question, "pick")
+            
+            if other_questions:
+                st.markdown("#### 📋 Other Props")
+                for question in other_questions:
+                    pick_inputs[question['key']] = render_question_input(question, "pick")
             
             submitted = st.form_submit_button("Submit Picks", type="primary")
             
             if submitted:
                 if not name or not email:
                     st.error("Please fill in your name and email!")
-                elif not winner or not mvp or total_points == 0:
-                    st.error("Please fill in all required fields (marked with *)")
                 else:
-                    picks = load_picks()
+                    # Check required fields
+                    required_missing = []
+                    for question in questions:
+                        if question.get('required', True):
+                            q_key = question['key']
+                            if not pick_inputs.get(q_key) or pick_inputs[q_key] == "":
+                                required_missing.append(question['text'])
                     
-                    # Check if email already exists
-                    if any(p['email'].lower() == email.lower() for p in picks):
-                        st.error("This email has already submitted picks!")
+                    if required_missing:
+                        st.error(f"Please fill in all required fields: {', '.join(required_missing[:3])}{'...' if len(required_missing) > 3 else ''}")
                     else:
-                        new_pick = {
-                            'name': name,
-                            'email': email.lower(),
-                            'winner': winner,
-                            'total_points': int(total_points),
-                            'mvp': mvp,
-                            'first_touchdown': first_touchdown if first_touchdown else None,
-                            'coin_toss': coin_toss if coin_toss else None,
-                            'national_anthem_duration': float(national_anthem_duration) if national_anthem_duration else 0.0,
-                            'first_commercial_category': first_commercial_category if first_commercial_category else None,
-                            'halftime_performer_song': halftime_performer_song if halftime_performer_song else None,
-                            'gatorade_color': gatorade_color if gatorade_color else None,
-                            'first_score_type': first_score_type if first_score_type else None,
-                            'submitted_at': datetime.now().isoformat()
-                        }
+                        picks = load_picks()
                         
-                        picks.append(new_pick)
-                        save_picks(picks)
-                        st.session_state.submitted = True
-                        st.success(f"✅ Picks submitted successfully, {name}!")
-                        st.balloons()
+                        # Check if email already exists
+                        if any(p['email'].lower() == email.lower() for p in picks):
+                            st.error("This email has already submitted picks!")
+                        else:
+                            # Clean up empty values
+                            cleaned_picks = {k: v if v != "" else None for k, v in pick_inputs.items()}
+                            
+                            new_pick = {
+                                'name': name,
+                                'email': email.lower(),
+                                **cleaned_picks,
+                                'submitted_at': datetime.now().isoformat()
+                            }
+                            
+                            picks.append(new_pick)
+                            save_picks(picks)
+                            st.session_state.submitted = True
+                            st.success(f"✅ Picks submitted successfully, {name}!")
+                            st.balloons()
     
     with tab2:
         st.header("🏆 Leaderboard")
@@ -209,13 +431,11 @@ def main():
             # Calculate scores
             leaderboard_data = []
             for pick in picks:
-                score = calculate_score(pick, results)
+                score = calculate_score(pick, results, questions)
                 leaderboard_data.append({
                     'Name': pick['name'],
                     'Score': score,
-                    'Winner': pick['winner'],
-                    'Total Points': pick['total_points'],
-                    'MVP': pick['mvp']
+                    'Email': pick.get('email', 'N/A')
                 })
             
             # Sort by score (descending)
@@ -232,9 +452,11 @@ def main():
             # Add rank column
             df.insert(0, 'Rank', range(1, len(df) + 1))
             
-            # Highlight top 3
+            # Display without email for privacy
+            display_df = df[['Rank', 'Name', 'Score']].copy()
+            
             st.dataframe(
-                df.style.apply(
+                display_df.style.apply(
                     lambda x: ['background-color: #FFD700' if x.name < 1 else 
                               'background-color: #C0C0C0' if x.name < 2 else
                               'background-color: #CD7F32' if x.name < 3 else '' 
@@ -262,33 +484,22 @@ def main():
         else:
             for i, pick in enumerate(picks, 1):
                 with st.expander(f"{pick['name']} - Submitted {pick['submitted_at'][:10]}"):
-                    col1, col2 = st.columns(2)
+                    # Display picks in organized sections
+                    pick_items = {k: v for k, v in pick.items() if k not in ['name', 'email', 'submitted_at']}
                     
-                    with col1:
-                        st.write("**Game Props:**")
-                        st.write(f"Winner: {pick['winner']}")
-                        st.write(f"Total Points: {pick['total_points']}")
-                        st.write(f"MVP: {pick['mvp']}")
-                        if pick.get('first_touchdown'):
-                            st.write(f"First Touchdown: {pick['first_touchdown']}")
-                        if pick.get('first_score_type'):
-                            st.write(f"First Score Type: {pick['first_score_type']}")
-                    
-                    with col2:
-                        st.write("**Other Props:**")
-                        if pick.get('coin_toss'):
-                            st.write(f"Coin Toss: {pick['coin_toss']}")
-                        if pick.get('gatorade_color'):
-                            st.write(f"Gatorade Color: {pick['gatorade_color']}")
-                        if pick.get('national_anthem_duration'):
-                            st.write(f"National Anthem: {pick['national_anthem_duration']}s")
-                        if pick.get('first_commercial_category'):
-                            st.write(f"First Commercial: {pick['first_commercial_category']}")
-                        if pick.get('halftime_performer_song'):
-                            st.write(f"Halftime Song: {pick['halftime_performer_song']}")
+                    cols = st.columns(2)
+                    col_idx = 0
+                    for q_key, q_value in pick_items.items():
+                        if q_value is not None:
+                            question = next((q for q in questions if q['key'] == q_key), None)
+                            if question:
+                                with cols[col_idx % 2]:
+                                    st.write(f"**{question['text']}**")
+                                    st.write(f"{q_value}")
+                                col_idx += 1
                     
                     if results:
-                        score = calculate_score(pick, results)
+                        score = calculate_score(pick, results, questions)
                         st.metric("Current Score", f"{score} points")
 
 if __name__ == "__main__":
