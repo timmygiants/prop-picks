@@ -18,6 +18,7 @@ st.set_page_config(
 DATA_FILE = "picks.json"
 RESULTS_FILE = "results.json"
 QUESTIONS_FILE = "Super Bowl LX Picks.xlsx"
+QUESTIONS_TXT_FILE = "questions.txt"
 QUESTION_CONFIG_FILE = "question_config.json"
 
 # Initialize session state
@@ -33,12 +34,119 @@ def load_question_config() -> Dict:
             return json.load(f)
     return {}
 
+def parse_questions_txt() -> List[Dict]:
+    """Parse questions from questions.txt file (Google Forms export format)"""
+    if not os.path.exists(QUESTIONS_TXT_FILE):
+        return []
+    
+    questions = []
+    exclude_questions = [
+        'Email',
+        'Name',
+        'Would you like to opt-in for $20 SUPER BOWL POOL',
+        'Did you Venmo $20',
+        'For auditing purposes, what is your Venmo handle',
+        'If you win, what is your charity of choice'
+    ]
+    
+    with open(QUESTIONS_TXT_FILE, 'r', encoding='utf-8') as f:
+        lines = [line.strip() for line in f.readlines()]
+    
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+        
+        # Skip header/metadata lines
+        if not line or line.startswith('Screen reader') or line.startswith('Super Bowl LX') or line.startswith('$20 Entry') or line.startswith('This form') or line.startswith('Banner') or line == '.':
+            i += 1
+            continue
+        
+        # Check if this looks like a question (not an answer option)
+        # Questions typically don't start with common answer patterns
+        if line and not line.startswith('*') and line not in ['Over', 'Under', 'Yes', 'No', 'Heads', 'Tails', 'Even', 'Odd', 'Up', 'Down']:
+            question_text = line
+            required = False
+            options = []
+            
+            # Check if next line is * (required indicator)
+            if i + 1 < len(lines) and lines[i + 1] == '*':
+                required = True
+                i += 2  # Skip question and *
+            else:
+                i += 1  # Skip just the question
+            
+            # Skip if this is an excluded question
+            if any(exc.lower() in question_text.lower() for exc in exclude_questions):
+                # Skip to next question (until we hit a line that looks like a question)
+                while i < len(lines) and (lines[i] in ['Over', 'Under', 'Yes', 'No', 'Heads', 'Tails', 'Even', 'Odd', 'Up', 'Down'] or lines[i].startswith('*') or not lines[i]):
+                    i += 1
+                continue
+            
+            # Collect answer options until we hit next question or empty line
+            while i < len(lines):
+                if not lines[i]:  # Empty line means end of options
+                    i += 1
+                    break
+                # If we hit something that looks like a new question (longer text, not a common answer)
+                if len(lines[i]) > 20 and lines[i] not in ['Over', 'Under', 'Yes', 'No', 'Heads', 'Tails', 'Even', 'Odd', 'Up', 'Down', 'Run', 'Pass/Sack']:
+                    break
+                # Collect option
+                if lines[i] and lines[i] != '*':
+                    options.append(lines[i])
+                i += 1
+            
+            # Determine question type based on options
+            if not options:
+                # No options = text or number input
+                if 'TIE BREAKER' in question_text.upper() or 'Total Points Scored' in question_text:
+                    q_type = 'number'
+                    q_options = []
+                else:
+                    q_type = 'text'
+                    q_options = []
+            elif len(options) == 2 and set(options) == {'Over', 'Under'}:
+                # Over/Under question
+                # Extract threshold from question text
+                match = re.search(r'over/under\s+([\d.]+)', question_text.lower())
+                threshold = float(match.group(1)) if match else 0
+                q_type = 'over_under'
+                q_options = [threshold]
+            elif len(options) == 2 and set(options) == {'Yes', 'No'}:
+                q_type = 'yes_no'
+                q_options = []
+            elif len(options) > 0:
+                q_type = 'select'
+                q_options = options
+            else:
+                q_type = 'text'
+                q_options = []
+            
+            questions.append({
+                'key': question_text,
+                'text': question_text,
+                'type': q_type,
+                'options': q_options,
+                'required': required
+            })
+        else:
+            i += 1
+    
+    return questions
+
 def load_questions() -> List[Dict]:
-    """Load questions from Excel file"""
+    """Load questions from questions.txt file (preferred) or Excel file"""
     if st.session_state.questions is not None:
         return st.session_state.questions
     
     try:
+        # Try to load from questions.txt first
+        questions = parse_questions_txt()
+        
+        if questions:
+            st.session_state.questions = questions
+            return questions
+        
+        # Fall back to Excel file if questions.txt doesn't exist or is empty
         df = pd.read_excel(QUESTIONS_FILE)
         config = load_question_config()
         
