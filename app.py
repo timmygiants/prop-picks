@@ -811,9 +811,6 @@ def main():
                         if results:
                             score = calculate_score(pick, results, questions)
                             st.metric("Current Score", f"{score} points")
-    else:
-        # Show message if picks are locked
-        st.info("🔒 Picks will be visible after 6pm EST on Sunday, February 8th, 2026")
 
 if __name__ == "__main__":
     main()
