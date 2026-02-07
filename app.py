@@ -342,8 +342,8 @@ def export_picks_to_excel(picks: List[Dict], filename: str = "picks_export.xlsx"
     df.to_excel(filename, index=False, engine='openpyxl')
     return filename
 
-def can_view_picks() -> bool:
-    """Check if current time is after 6pm EST on Sunday 2/8/2026"""
+def get_est_time():
+    """Get current time in EST"""
     try:
         est = ZoneInfo("America/New_York")
     except:
@@ -351,13 +351,25 @@ def can_view_picks() -> bool:
         from datetime import timedelta
         est_offset = timedelta(hours=-5)  # EST is UTC-5
         est = timezone(est_offset)
-    
-    now = datetime.now(est)
+    return datetime.now(est), est
+
+def can_view_picks() -> bool:
+    """Check if current time is after 6pm EST on Sunday 2/8/2026"""
+    now, est = get_est_time()
     
     # Target: 6pm EST on Sunday, February 8, 2026
     target = datetime(2026, 2, 8, 18, 0, 0, tzinfo=est)
     
     return now >= target
+
+def can_submit_picks() -> bool:
+    """Check if submissions are still open (before 6pm EST on Sunday 2/8/2026)"""
+    now, est = get_est_time()
+    
+    # Lock at 6pm EST on Sunday, February 8, 2026
+    lock_time = datetime(2026, 2, 8, 18, 0, 0, tzinfo=est)
+    
+    return now < lock_time
 
 def load_results() -> Dict:
     """Load actual results from JSON file"""
@@ -377,7 +389,7 @@ def calculate_score(picks: Dict, results: Dict, questions: List[Dict]) -> int:
         return 0
     
     score = 0
-    base_points = 5  # Default points per question
+    base_points = 1  # Default points per question
     
     for question in questions:
         q_key = question['key']
@@ -598,6 +610,11 @@ def main():
         
         *Note: You're welcome to play for fun, but we encourage you to join the pool to help support charity!*
         """)
+        
+        # Check if submissions are locked
+        if not can_submit_picks():
+            st.error("🔒 **Submissions are now closed!** Picks were locked at 6pm EST on Sunday, February 8th, 2026.")
+            st.stop()
         
         with st.form("picks_form"):
             col1, col2 = st.columns(2)
