@@ -45,6 +45,7 @@ def parse_questions_txt() -> List[Dict]:
         'Email',
         'Name',
         'Would you like to opt-in for $20 SUPER BOWL POOL',
+        'Yes, I like charity and sent $20',
         'Did you Venmo $20',
         'For auditing purposes, what is your Venmo handle',
         'If you win, what is your charity of choice'
