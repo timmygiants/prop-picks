@@ -66,6 +66,10 @@ def determine_question_type(question_text: str) -> Tuple[str, List]:
     """Determine question type and options based on question text"""
     q_lower = question_text.lower()
     
+    # Game spread question (first question about which team covers)
+    if ('seattle seahawks' in q_lower or 'seahawks' in q_lower) and ('new england patriots' in q_lower or 'patriots' in q_lower) and ('@' in question_text or '-' in question_text):
+        return 'select', ['Seahawks -4.5', 'Patriots +4.5']
+    
     # Over/Under questions
     if 'over/under' in q_lower:
         # Extract the number
