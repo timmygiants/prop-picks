@@ -89,11 +89,11 @@ def parse_questions_txt() -> List[Dict]:
                     i += 1
                     break
                 
-                # Check if this looks like a new question (has question mark or starts with question words)
+                # Check if this looks like a new question (has question mark or starts with question words or specific patterns)
                 looks_like_question = (
                     '?' in lines[i] or
-                    lines[i].startswith(('Who ', 'What ', 'Which ', 'Will ', 'How ', 'When ', 'Where ', 'Why ')) or
-                    lines[i].startswith(('Seattle ', 'Total ', 'National ', 'First ', 'More ', 'Number ', 'Color ', 'Bad ', 'A commercial', 'From kick-off'))
+                    lines[i].startswith(('Who ', 'What ', 'Which ', 'Will ', 'How ', 'When ', 'Where ', 'Why ', 'At ')) or
+                    lines[i].startswith(('Seattle ', 'Total ', 'National ', 'First ', 'More ', 'Number ', 'Color ', 'Bad ', 'A commercial', 'From kick-off', 'TIE BREAKER', 'Would you', 'Did you', 'For auditing', 'If you win'))
                 )
                 
                 # If it looks like a question and we already have options, this is a new question
@@ -115,8 +115,8 @@ def parse_questions_txt() -> List[Dict]:
                 else:
                     # It looks like a question but we don't have options yet - might be the first question
                     # or might be an option that happens to look like a question
-                    # If we're collecting options, treat it as an option unless it has a question mark
-                    if len(options) == 0 and '?' in lines[i]:
+                    # If we're collecting options, treat it as an option unless it has a question mark or starts with specific patterns
+                    if len(options) == 0 and ('?' in lines[i] or lines[i].startswith(('TIE BREAKER', 'Would you', 'Did you', 'For auditing', 'If you win'))):
                         # This is actually a new question
                         break
                     else:
