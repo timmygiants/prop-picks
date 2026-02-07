@@ -5,6 +5,7 @@ from datetime import datetime
 from typing import Dict, List, Optional, Tuple
 import pandas as pd
 import re
+import hashlib
 
 # Page config
 st.set_page_config(
@@ -207,6 +208,15 @@ def calculate_score(picks: Dict, results: Dict, questions: List[Dict]) -> int:
     
     return score
 
+def create_safe_key(text: str, prefix: str = "") -> str:
+    """Create a safe, unique key from text"""
+    # Create a hash of the text for uniqueness
+    text_hash = hashlib.md5(text.encode()).hexdigest()[:8]
+    # Sanitize the text for use in key
+    safe_text = re.sub(r'[^a-zA-Z0-9]', '_', text[:30])
+    key = f"{prefix}_{safe_text}_{text_hash}" if prefix else f"{safe_text}_{text_hash}"
+    return key
+
 def render_question_input(question: Dict, key_prefix: str = ""):
     """Render appropriate input widget for a question"""
     q_key = question['key']
@@ -215,7 +225,7 @@ def render_question_input(question: Dict, key_prefix: str = ""):
     q_options = question['options']
     q_required = question.get('required', True)
     
-    full_key = f"{key_prefix}_{q_key}" if key_prefix else q_key
+    full_key = create_safe_key(q_key, key_prefix)
     
     if q_type == 'over_under':
         threshold = q_options[0] if q_options else 0
@@ -278,6 +288,7 @@ def main():
                 q_options = question['options']
                 
                 current_value = results.get(q_key, "")
+                safe_key = create_safe_key(q_key, "result")
                 
                 if q_type == 'over_under':
                     threshold = q_options[0] if q_options else 0
@@ -285,14 +296,14 @@ def main():
                         q_text,
                         ["", "Over", "Under"],
                         index=0 if not current_value else (1 if current_value == "Over" else 2),
-                        key=f"result_{q_key}"
+                        key=safe_key
                     )
                 elif q_type == 'yes_no':
                     result_inputs[q_key] = st.selectbox(
                         q_text,
                         ["", "Yes", "No"],
                         index=0 if not current_value else (1 if current_value == "Yes" else 2),
-                        key=f"result_{q_key}"
+                        key=safe_key
                     )
                 elif q_type == 'select':
                     options = [""] + q_options
@@ -304,7 +315,7 @@ def main():
                         q_text,
                         options,
                         index=idx,
-                        key=f"result_{q_key}"
+                        key=safe_key
                     )
                 elif q_type == 'number':
                     result_inputs[q_key] = st.number_input(
@@ -312,13 +323,13 @@ def main():
                         min_value=0.0,
                         value=float(current_value) if current_value else 0.0,
                         step=0.1,
-                        key=f"result_{q_key}"
+                        key=safe_key
                     )
                 else:  # text
                     result_inputs[q_key] = st.text_input(
                         q_text,
                         value=current_value if current_value else "",
-                        key=f"result_{q_key}"
+                        key=safe_key
                     )
             
             if st.button("Save Results"):
