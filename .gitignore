@@ -24,7 +24,8 @@ wheels/
 *.egg
 
 # Streamlit
-.streamlit/
+.streamlit/*
+!.streamlit/config.toml
 
 # Data files (optional - remove if you want to track picks in git)
 picks.json
