@@ -526,6 +526,8 @@ def main():
         Must submit picks by 02/08 before National Anthem start. 
         If you want to change your picks, we will accept latest entries. 
         Please Venmo **tim-roberts-16**
+        
+        *Note: You're welcome to play for fun, but we encourage you to join the pool to help support charity!*
         """)
         
         with st.form("picks_form"):
