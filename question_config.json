@@ -1,0 +1,150 @@
+{
+  "Seattle Seahawks (-4.5) vs New England Patriots - Game in Santa Clara, CA": {
+    "type": "select",
+    "options": ["Seahawks -4.5", "Patriots +4.5"]
+  },
+  "Total Points: Over/Under 45.5": {
+    "type": "over_under",
+    "threshold": 45.5
+  },
+  "Total Points: Even or Odd": {
+    "type": "select",
+    "options": ["Even", "Odd"]
+  },
+  "National Anthem Length (Charlie Puth): Over/Under 119.5 seconds (from \"Oh\" until lead vocals stop)": {
+    "type": "over_under",
+    "threshold": 119.5
+  },
+  "Which Coach will be shown first during National Anthem?": {
+    "type": "select",
+    "options": ["Seattle Seahawks Coach", "New England Patriots Coach"]
+  },
+  "Will a player or coach be shown crying during the singing of the National Anthem? (concludes at end of vocals)": {
+    "type": "yes_no"
+  },
+  "Coin Toss - Heads or Tails?": {
+    "type": "select",
+    "options": ["Heads", "Tails"]
+  },
+  "Who wins Coin Toss?": {
+    "type": "select",
+    "options": ["Seattle Seahawks", "New England Patriots"]
+  },
+  "First Play from Scrimmage: Run or Pass/Sack": {
+    "type": "select",
+    "options": ["Run", "Pass/Sack"]
+  },
+  "Jersey Number of First TD Scored: Over/Under 10.5": {
+    "type": "over_under",
+    "threshold": 10.5
+  },
+  "Drake Maye (NE) Passing Yards: Over/Under 223.5": {
+    "type": "over_under",
+    "threshold": 223.5
+  },
+  "Sam Darnold (Sea) Passing Touchdowns: Over/Under 1.5": {
+    "type": "over_under",
+    "threshold": 1.5
+  },
+  "Rhamondre Stevenson (NE) Rushing + Receiving Yards: Over/Under 79.5": {
+    "type": "over_under",
+    "threshold": 79.5
+  },
+  "Kenneth Walker III (Sea) Rushing Attempts: Over/Under 18.5": {
+    "type": "over_under",
+    "threshold": 18.5
+  },
+  "Stefon Diggs (NE) Receptions: Over/Under 4.5": {
+    "type": "over_under",
+    "threshold": 4.5
+  },
+  "Jaxon Smith-Njigba (Sea) Receiving Yards: Over/Under 93.5": {
+    "type": "over_under",
+    "threshold": 93.5
+  },
+  "Who will have more receiving yards? Hunter Henry (NE) or Cooper Kupp (Sea)": {
+    "type": "select",
+    "options": ["Hunter Henry (NE)", "Cooper Kupp (Sea)"]
+  },
+  "More Total Tackles: Christian Elliss (NE) or Nick Emmanwori (Sea)": {
+    "type": "select",
+    "options": ["Christian Elliss (NE)", "Nick Emmanwori (Sea)"]
+  },
+  "Will Both Teams Make 34 Yard or Longer Field Goal?": {
+    "type": "yes_no"
+  },
+  "First Turnover: Fumble, Interception, Turnover on Downs?": {
+    "type": "select",
+    "options": ["Fumble", "Interception", "Turnover on Downs", "None"]
+  },
+  "Will there be a successful 2-point conversion?": {
+    "type": "yes_no"
+  },
+  "Will a non-QB attempt a pass?": {
+    "type": "yes_no"
+  },
+  "Will any punts result in a touchback?": {
+    "type": "yes_no"
+  },
+  "Total Accepted Penalties: Over/Under 10.5": {
+    "type": "over_under",
+    "threshold": 10.5
+  },
+  "A commercial for which of the following food / beverage products will be shown first? (after kick-off)": {
+    "type": "text"
+  },
+  "First Pharmaceutical Commercial: Weight Loss/Diabetes (ie Ozempic, Jardiance) or Other (after kick-off)": {
+    "type": "select",
+    "options": ["Weight Loss/Diabetes", "Other"]
+  },
+  "First Car Commercial: Gas, Electric, or Hybrid? (after kick-off)": {
+    "type": "select",
+    "options": ["Gas", "Electric", "Hybrid"]
+  },
+  "Total Commercials Showing a Person with a COVID Mask: Over/Under 1.5 (after kick-off)": {
+    "type": "over_under",
+    "threshold": 1.5
+  },
+  "Number of commercials with dogs: Over/Under 7.5 (from kick-off to end of regulation - does not include animated dogs or costumes)": {
+    "type": "over_under",
+    "threshold": 7.5
+  },
+  "How many commercials will have some one wearing a COVID mask? Over/Under 1.5 (from kick-off to end of regulation)": {
+    "type": "over_under",
+    "threshold": 1.5
+  },
+  "From kick-off to end of regulation, will price of Bitcoin go up or down?": {
+    "type": "select",
+    "options": ["Up", "Down"]
+  },
+  "Will Bad Bunny Make a Political Statement during the Halftime Show? (my interpretation)": {
+    "type": "yes_no"
+  },
+  "Bad Bunny First Song": {
+    "type": "text"
+  },
+  "Will Bad Bunny wear a dress?": {
+    "type": "yes_no"
+  },
+  "Total Songs during Halftime Show: Over/Under 10.5": {
+    "type": "over_under",
+    "threshold": 10.5
+  },
+  "Total Number of Mentions of Patrick Mahomes AND Travis Kelce: Over/Under 1.5": {
+    "type": "over_under",
+    "threshold": 1.5
+  },
+  "Color of Gatorade bath for Head Coach of winning team:": {
+    "type": "select",
+    "options": ["Orange", "Yellow", "Green", "Blue", "Purple", "Red", "Clear/Water", "None"]
+  },
+  "Who will MVP mention first? (after accepting award)": {
+    "type": "text"
+  },
+  "TIE BREAKER -  Total Points Scored (Price is Right Rules - As close as you can without going over)": {
+    "type": "number"
+  },
+  "Will Cardi B perform at the Halftime Show?": {
+    "type": "yes_no"
+  }
+}

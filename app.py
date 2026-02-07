@@ -18,12 +18,20 @@ st.set_page_config(
 DATA_FILE = "picks.json"
 RESULTS_FILE = "results.json"
 QUESTIONS_FILE = "Super Bowl LX Picks.xlsx"
+QUESTION_CONFIG_FILE = "question_config.json"
 
 # Initialize session state
 if "submitted" not in st.session_state:
     st.session_state.submitted = False
 if "questions" not in st.session_state:
     st.session_state.questions = None
+
+def load_question_config() -> Dict:
+    """Load question configuration from JSON file"""
+    if os.path.exists(QUESTION_CONFIG_FILE):
+        with open(QUESTION_CONFIG_FILE, 'r') as f:
+            return json.load(f)
+    return {}
 
 def load_questions() -> List[Dict]:
     """Load questions from Excel file"""
@@ -32,6 +40,7 @@ def load_questions() -> List[Dict]:
     
     try:
         df = pd.read_excel(QUESTIONS_FILE)
+        config = load_question_config()
         
         # Exclude metadata columns
         exclude_cols = [
@@ -47,7 +56,18 @@ def load_questions() -> List[Dict]:
         questions = []
         for col in df.columns:
             if col not in exclude_cols:
-                q_type, options = determine_question_type(col)
+                # Check if question is in config file first
+                if col in config:
+                    q_config = config[col]
+                    q_type = q_config.get('type', 'text')
+                    if q_type == 'over_under':
+                        options = [q_config.get('threshold', 0)]
+                    else:
+                        options = q_config.get('options', [])
+                else:
+                    # Fall back to automatic detection
+                    q_type, options = determine_question_type(col)
+                
                 questions.append({
                     'key': col,
                     'text': col,
