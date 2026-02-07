@@ -87,13 +87,42 @@ def parse_questions_txt() -> List[Dict]:
                 if not lines[i]:  # Empty line means end of options
                     i += 1
                     break
-                # If we hit something that looks like a new question (longer text, not a common answer)
-                if len(lines[i]) > 20 and lines[i] not in ['Over', 'Under', 'Yes', 'No', 'Heads', 'Tails', 'Even', 'Odd', 'Up', 'Down', 'Run', 'Pass/Sack']:
+                
+                # Check if this looks like a new question (has question mark or starts with question words)
+                looks_like_question = (
+                    '?' in lines[i] or
+                    lines[i].startswith(('Who ', 'What ', 'Which ', 'Will ', 'How ', 'When ', 'Where ', 'Why ')) or
+                    lines[i].startswith(('Seattle ', 'Total ', 'National ', 'First ', 'More ', 'Number ', 'Color ', 'Bad ', 'A commercial', 'From kick-off'))
+                )
+                
+                # If it looks like a question and we already have options, this is a new question
+                if looks_like_question and len(options) > 0:
                     break
-                # Collect option
-                if lines[i] and lines[i] != '*':
-                    options.append(lines[i])
-                i += 1
+                
+                # If it's a common answer option, collect it
+                if lines[i] in ['Over', 'Under', 'Yes', 'No', 'Heads', 'Tails', 'Even', 'Odd', 'Up', 'Down', 'Run', 'Pass/Sack', 'Fumble', 'Interception', 'Turnover on Downs']:
+                    if lines[i] != '*':
+                        options.append(lines[i])
+                    i += 1
+                    continue
+                
+                # If it doesn't look like a question, it's an option
+                if not looks_like_question:
+                    if lines[i] != '*':
+                        options.append(lines[i])
+                    i += 1
+                else:
+                    # It looks like a question but we don't have options yet - might be the first question
+                    # or might be an option that happens to look like a question
+                    # If we're collecting options, treat it as an option unless it has a question mark
+                    if len(options) == 0 and '?' in lines[i]:
+                        # This is actually a new question
+                        break
+                    else:
+                        # Treat as option
+                        if lines[i] != '*':
+                            options.append(lines[i])
+                        i += 1
             
             # Determine question type based on options
             if not options:
