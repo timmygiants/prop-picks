@@ -54,17 +54,36 @@ A Streamlit application for collecting and tracking Super Bowl prop bet picks wi
 - First Commercial Category: 3 points
 - Halftime Performer Song: 3 points
 
+## Question Configuration
+
+Since Google Forms exports don't include answer options, questions are configured in `question_config.json`. This file maps each question to its type and options:
+
+- **select**: Dropdown with specific options (e.g., "Heads/Tails", "Even/Odd")
+- **over_under**: Over/Under question with a threshold number
+- **yes_no**: Yes/No question
+- **text**: Free text input
+- **number**: Number input
+
+To add or modify questions:
+1. Edit `question_config.json`
+2. Use the exact question text from your Excel file as the key
+3. Specify the `type` and `options` (or `threshold` for over/under)
+
+Questions not in the config file will use automatic detection based on question text patterns.
+
 ## Data Storage
 
 - Picks are stored in `picks.json`
 - Results are stored in `results.json`
-- Both files are created automatically on first use
+- Question configuration is in `question_config.json`
+- All files are created automatically on first use
 
 ## Notes
 
 - Each email can only submit picks once
 - Scores are calculated automatically when results are entered
 - The leaderboard updates in real-time
+- Admin password: `Pr0pP!cks` (set in code)
 
 ## License
 
