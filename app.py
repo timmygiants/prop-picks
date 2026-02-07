@@ -67,7 +67,7 @@ def determine_question_type(question_text: str) -> Tuple[str, List]:
     q_lower = question_text.lower()
     
     # Game spread question (first question about which team covers)
-    if ('seattle seahawks' in q_lower or 'seahawks' in q_lower) and ('new england patriots' in q_lower or 'patriots' in q_lower) and ('@' in question_text or '-' in question_text):
+    if ('seattle seahawks' in q_lower or 'seahawks' in q_lower) and ('new england patriots' in q_lower or 'patriots' in q_lower) and ('@' in question_text or 'vs' in q_lower or '-' in question_text):
         return 'select', ['Seahawks -4.5', 'Patriots +4.5']
     
     # Over/Under questions
@@ -284,75 +284,90 @@ def main():
     # Sidebar for admin (results entry)
     with st.sidebar:
         st.header("⚙️ Admin")
-        if st.checkbox("Enter Results (Admin Only)"):
-            st.subheader("Enter Actual Results")
-            results = load_results()
-            
-            result_inputs = {}
-            for idx, question in enumerate(questions):
-                q_key = question['key']
-                q_text = question['text']
-                q_type = question['type']
-                q_options = question['options']
+        admin_password = st.text_input("Admin Password", type="password", key="admin_password")
+        admin_authenticated = (admin_password == "Pr0pP!cks")
+        
+        if admin_authenticated:
+            if st.checkbox("Enter Results (Admin Only)"):
+                st.subheader("Enter Actual Results")
+                results = load_results()
                 
-                current_value = results.get(q_key, "")
-                safe_key = create_safe_key(q_key, "result", idx)
+                result_inputs = {}
+                for idx, question in enumerate(questions):
+                    q_key = question['key']
+                    q_text = question['text']
+                    q_type = question['type']
+                    q_options = question['options']
+                    
+                    current_value = results.get(q_key, "")
+                    safe_key = create_safe_key(q_key, "result", idx)
+                    
+                    if q_type == 'over_under':
+                        threshold = q_options[0] if q_options else 0
+                        result_inputs[q_key] = st.selectbox(
+                            q_text,
+                            ["", "Over", "Under"],
+                            index=0 if not current_value else (1 if current_value == "Over" else 2),
+                            key=safe_key
+                        )
+                    elif q_type == 'yes_no':
+                        result_inputs[q_key] = st.selectbox(
+                            q_text,
+                            ["", "Yes", "No"],
+                            index=0 if not current_value else (1 if current_value == "Yes" else 2),
+                            key=safe_key
+                        )
+                    elif q_type == 'select':
+                        options = [""] + q_options
+                        try:
+                            idx = options.index(current_value) if current_value else 0
+                        except:
+                            idx = 0
+                        result_inputs[q_key] = st.selectbox(
+                            q_text,
+                            options,
+                            index=idx,
+                            key=safe_key
+                        )
+                    elif q_type == 'number':
+                        result_inputs[q_key] = st.number_input(
+                            q_text,
+                            min_value=0.0,
+                            value=float(current_value) if current_value else 0.0,
+                            step=0.1,
+                            key=safe_key
+                        )
+                    else:  # text
+                        result_inputs[q_key] = st.text_input(
+                            q_text,
+                            value=current_value if current_value else "",
+                            key=safe_key
+                        )
                 
-                if q_type == 'over_under':
-                    threshold = q_options[0] if q_options else 0
-                    result_inputs[q_key] = st.selectbox(
-                        q_text,
-                        ["", "Over", "Under"],
-                        index=0 if not current_value else (1 if current_value == "Over" else 2),
-                        key=safe_key
-                    )
-                elif q_type == 'yes_no':
-                    result_inputs[q_key] = st.selectbox(
-                        q_text,
-                        ["", "Yes", "No"],
-                        index=0 if not current_value else (1 if current_value == "Yes" else 2),
-                        key=safe_key
-                    )
-                elif q_type == 'select':
-                    options = [""] + q_options
-                    try:
-                        idx = options.index(current_value) if current_value else 0
-                    except:
-                        idx = 0
-                    result_inputs[q_key] = st.selectbox(
-                        q_text,
-                        options,
-                        index=idx,
-                        key=safe_key
-                    )
-                elif q_type == 'number':
-                    result_inputs[q_key] = st.number_input(
-                        q_text,
-                        min_value=0.0,
-                        value=float(current_value) if current_value else 0.0,
-                        step=0.1,
-                        key=safe_key
-                    )
-                else:  # text
-                    result_inputs[q_key] = st.text_input(
-                        q_text,
-                        value=current_value if current_value else "",
-                        key=safe_key
-                    )
-            
-            if st.button("Save Results"):
-                # Clean up empty values
-                cleaned_results = {k: v if v != "" else None for k, v in result_inputs.items()}
-                cleaned_results['updated_at'] = datetime.now().isoformat()
-                save_results(cleaned_results)
-                st.success("Results saved!")
-                st.rerun()
+                if st.button("Save Results"):
+                    # Clean up empty values
+                    cleaned_results = {k: v if v != "" else None for k, v in result_inputs.items()}
+                    cleaned_results['updated_at'] = datetime.now().isoformat()
+                    save_results(cleaned_results)
+                    st.success("Results saved!")
+                    st.rerun()
+        else:
+            if admin_password:
+                st.error("Incorrect password")
     
     # Main tabs
     tab1, tab2, tab3 = st.tabs(["📝 Submit Picks", "📊 Leaderboard", "📋 All Picks"])
     
     with tab1:
         st.header("Submit Your Prop Picks")
+        
+        # Instructions
+        st.info("""
+        **$20 Entry** - Half of winnings to Charity of Winner's choice and other half in their pocket. 
+        Must submit picks by 02/08 before National Anthem start. 
+        If you want to change your picks, we will accept latest entries. 
+        Please Venmo **tim-roberts-16**
+        """)
         
         with st.form("picks_form"):
             col1, col2 = st.columns(2)
