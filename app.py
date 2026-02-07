@@ -208,16 +208,20 @@ def calculate_score(picks: Dict, results: Dict, questions: List[Dict]) -> int:
     
     return score
 
-def create_safe_key(text: str, prefix: str = "") -> str:
+def create_safe_key(text: str, prefix: str = "", index: int = None) -> str:
     """Create a safe, unique key from text"""
     # Create a hash of the text for uniqueness
     text_hash = hashlib.md5(text.encode()).hexdigest()[:8]
     # Sanitize the text for use in key
     safe_text = re.sub(r'[^a-zA-Z0-9]', '_', text[:30])
-    key = f"{prefix}_{safe_text}_{text_hash}" if prefix else f"{safe_text}_{text_hash}"
+    # Include index if provided for extra uniqueness
+    if index is not None:
+        key = f"{prefix}_{index}_{safe_text}_{text_hash}" if prefix else f"{index}_{safe_text}_{text_hash}"
+    else:
+        key = f"{prefix}_{safe_text}_{text_hash}" if prefix else f"{safe_text}_{text_hash}"
     return key
 
-def render_question_input(question: Dict, key_prefix: str = ""):
+def render_question_input(question: Dict, key_prefix: str = "", index: int = None):
     """Render appropriate input widget for a question"""
     q_key = question['key']
     q_text = question['text']
@@ -225,7 +229,7 @@ def render_question_input(question: Dict, key_prefix: str = ""):
     q_options = question['options']
     q_required = question.get('required', True)
     
-    full_key = create_safe_key(q_key, key_prefix)
+    full_key = create_safe_key(q_key, key_prefix, index)
     
     if q_type == 'over_under':
         threshold = q_options[0] if q_options else 0
@@ -281,14 +285,14 @@ def main():
             results = load_results()
             
             result_inputs = {}
-            for question in questions:
+            for idx, question in enumerate(questions):
                 q_key = question['key']
                 q_text = question['text']
                 q_type = question['type']
                 q_options = question['options']
                 
                 current_value = results.get(q_key, "")
-                safe_key = create_safe_key(q_key, "result")
+                safe_key = create_safe_key(q_key, "result", idx)
                 
                 if q_type == 'over_under':
                     threshold = q_options[0] if q_options else 0
@@ -358,38 +362,69 @@ def main():
             st.markdown("Please answer all questions. Questions marked with * are required.")
             
             # Group questions into sections for better organization
-            game_questions = [q for q in questions if any(word in q['text'].lower() for word in ['game', 'points', 'coin', 'play', 'touchdown', 'turnover', 'penalty', 'field goal', 'conversion', 'pass', 'run', 'tackle', 'reception', 'rushing', 'passing', 'jersey'])]
-            commercial_questions = [q for q in questions if 'commercial' in q['text'].lower()]
-            halftime_questions = [q for q in questions if any(word in q['text'].lower() for word in ['halftime', 'kendrick', 'lamar', 'song'])]
-            anthem_questions = [q for q in questions if 'anthem' in q['text'].lower()]
-            other_questions = [q for q in questions if q not in game_questions and q not in commercial_questions and q not in halftime_questions and q not in anthem_questions]
+            # Use sets to track which questions have been added to avoid duplicates
+            added_questions = set()
+            game_questions = []
+            commercial_questions = []
+            halftime_questions = []
+            anthem_questions = []
+            other_questions = []
+            
+            # Categorize questions, ensuring no duplicates
+            for q in questions:
+                q_key = q['key']
+                if q_key in added_questions:
+                    continue
+                
+                q_lower = q['text'].lower()
+                if any(word in q_lower for word in ['game', 'points', 'coin', 'play', 'touchdown', 'turnover', 'penalty', 'field goal', 'conversion', 'pass', 'run', 'tackle', 'reception', 'rushing', 'passing', 'jersey']):
+                    game_questions.append(q)
+                    added_questions.add(q_key)
+                elif 'commercial' in q_lower:
+                    commercial_questions.append(q)
+                    added_questions.add(q_key)
+                elif any(word in q_lower for word in ['halftime', 'kendrick', 'lamar', 'song']):
+                    halftime_questions.append(q)
+                    added_questions.add(q_key)
+                elif 'anthem' in q_lower:
+                    anthem_questions.append(q)
+                    added_questions.add(q_key)
+                else:
+                    other_questions.append(q)
+                    added_questions.add(q_key)
             
             pick_inputs = {}
+            question_index = 0
             
             if game_questions:
                 st.markdown("#### 🏈 Game Props")
                 for question in game_questions:
-                    pick_inputs[question['key']] = render_question_input(question, "pick")
+                    pick_inputs[question['key']] = render_question_input(question, "pick", question_index)
+                    question_index += 1
             
             if anthem_questions:
                 st.markdown("#### 🎤 National Anthem Props")
                 for question in anthem_questions:
-                    pick_inputs[question['key']] = render_question_input(question, "pick")
+                    pick_inputs[question['key']] = render_question_input(question, "pick", question_index)
+                    question_index += 1
             
             if commercial_questions:
                 st.markdown("#### 📺 Commercial Props")
                 for question in commercial_questions:
-                    pick_inputs[question['key']] = render_question_input(question, "pick")
+                    pick_inputs[question['key']] = render_question_input(question, "pick", question_index)
+                    question_index += 1
             
             if halftime_questions:
                 st.markdown("#### 🎵 Halftime Show Props")
                 for question in halftime_questions:
-                    pick_inputs[question['key']] = render_question_input(question, "pick")
+                    pick_inputs[question['key']] = render_question_input(question, "pick", question_index)
+                    question_index += 1
             
             if other_questions:
                 st.markdown("#### 📋 Other Props")
                 for question in other_questions:
-                    pick_inputs[question['key']] = render_question_input(question, "pick")
+                    pick_inputs[question['key']] = render_question_input(question, "pick", question_index)
+                    question_index += 1
             
             submitted = st.form_submit_button("Submit Picks", type="primary")
             
