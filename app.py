@@ -1,11 +1,12 @@
 import streamlit as st
 import json
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, List, Optional, Tuple
 import pandas as pd
 import re
 import hashlib
+from zoneinfo import ZoneInfo
 
 # Page config
 st.set_page_config(
@@ -311,6 +312,52 @@ def save_picks(picks: List[Dict]):
     with open(DATA_FILE, 'w') as f:
         json.dump(picks, f, indent=2)
 
+def export_picks_to_excel(picks: List[Dict], filename: str = "picks_export.xlsx"):
+    """Export all picks to Excel file with name and email"""
+    if not picks:
+        return None
+    
+    # Create a list of dictionaries for the DataFrame
+    export_data = []
+    for pick in picks:
+        row = {
+            'Name': pick.get('name', ''),
+            'Email': pick.get('email', ''),
+            'Playing for Money': pick.get('playing_for_money', ''),
+            'Submitted At': pick.get('submitted_at', '')
+        }
+        
+        # Add all question answers
+        for key, value in pick.items():
+            if key not in ['name', 'email', 'playing_for_money', 'submitted_at']:
+                row[key] = value if value is not None else ''
+        
+        export_data.append(row)
+    
+    # Create DataFrame
+    df = pd.DataFrame(export_data)
+    
+    # Export to Excel
+    df.to_excel(filename, index=False, engine='openpyxl')
+    return filename
+
+def can_view_picks() -> bool:
+    """Check if current time is after 6pm EST on Sunday 2/8/2026"""
+    try:
+        est = ZoneInfo("America/New_York")
+    except:
+        # Fallback for systems without zoneinfo
+        from datetime import timedelta
+        est_offset = timedelta(hours=-5)  # EST is UTC-5
+        est = timezone(est_offset)
+    
+    now = datetime.now(est)
+    
+    # Target: 6pm EST on Sunday, February 8, 2026
+    target = datetime(2026, 2, 8, 18, 0, 0, tzinfo=est)
+    
+    return now >= target
+
 def load_results() -> Dict:
     """Load actual results from JSON file"""
     if os.path.exists(RESULTS_FILE):
@@ -447,6 +494,23 @@ def main():
         admin_authenticated = (admin_password == "Pr0pP!cks")
         
         if admin_authenticated:
+            st.subheader("Admin Tools")
+            
+            # Export picks to Excel
+            picks = load_picks()
+            if picks:
+                if st.button("📥 Export All Picks to Excel"):
+                    filename = export_picks_to_excel(picks, "picks_export.xlsx")
+                    if filename and os.path.exists(filename):
+                        with open(filename, 'rb') as f:
+                            st.download_button(
+                                label="Download Excel File",
+                                data=f.read(),
+                                file_name=filename,
+                                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                            )
+                        st.success(f"Exported {len(picks)} picks to Excel!")
+            
             if st.checkbox("Enter Results (Admin Only)"):
                 st.subheader("Enter Actual Results")
                 results = load_results()
@@ -514,8 +578,12 @@ def main():
             if admin_password:
                 st.error("Incorrect password")
     
-    # Main tabs
-    tab1, tab2, tab3 = st.tabs(["📝 Submit Picks", "📊 Leaderboard", "📋 All Picks"])
+    # Main tabs - conditionally show "All Picks" tab
+    if can_view_picks():
+        tab1, tab2, tab3 = st.tabs(["📝 Submit Picks", "📊 Leaderboard", "📋 All Picks"])
+    else:
+        tab1, tab2 = st.tabs(["📝 Submit Picks", "📊 Leaderboard"])
+        tab3 = None
     
     with tab1:
         st.header("Submit Your Prop Picks")
@@ -537,6 +605,13 @@ def main():
                 name = st.text_input("Your Name *", placeholder="Enter your name")
             with col2:
                 email = st.text_input("Email *", placeholder="your.email@example.com")
+            
+            # Playing for money question
+            playing_for_money = st.selectbox(
+                "Are you playing for money? *",
+                ["", "Yes, I'm in the $20 pool", "No, just playing for fun"],
+                help="Select whether you're participating in the $20 charity pool or just playing for fun"
+            )
             
             st.markdown("### Prop Questions")
             st.markdown("Please answer all questions. Questions marked with * are required.")
@@ -611,6 +686,8 @@ def main():
             if submitted:
                 if not name or not email:
                     st.error("Please fill in your name and email!")
+                elif not playing_for_money:
+                    st.error("Please indicate if you're playing for money or just for fun!")
                 else:
                     # Check required fields
                     required_missing = []
@@ -635,6 +712,7 @@ def main():
                             new_pick = {
                                 'name': name,
                                 'email': email.lower(),
+                                'playing_for_money': playing_for_money if playing_for_money else None,
                                 **cleaned_picks,
                                 'submitted_at': datetime.now().isoformat()
                             }
@@ -699,34 +777,43 @@ def main():
                     medal = "🥇" if row['Rank'] == 1 else "🥈" if row['Rank'] == 2 else "🥉"
                     st.markdown(f"{medal} **{row['Name']}** - {row['Score']} points")
     
-    with tab3:
-        st.header("All Submitted Picks")
-        
-        picks = load_picks()
-        results = load_results()
-        
-        if not picks:
-            st.info("No picks submitted yet.")
-        else:
-            for i, pick in enumerate(picks, 1):
-                with st.expander(f"{pick['name']} - Submitted {pick['submitted_at'][:10]}"):
-                    # Display picks in organized sections
-                    pick_items = {k: v for k, v in pick.items() if k not in ['name', 'email', 'submitted_at']}
-                    
-                    cols = st.columns(2)
-                    col_idx = 0
-                    for q_key, q_value in pick_items.items():
-                        if q_value is not None:
-                            question = next((q for q in questions if q['key'] == q_key), None)
-                            if question:
-                                with cols[col_idx % 2]:
-                                    st.write(f"**{question['text']}**")
-                                    st.write(f"{q_value}")
-                                col_idx += 1
-                    
-                    if results:
-                        score = calculate_score(pick, results, questions)
-                        st.metric("Current Score", f"{score} points")
+    if tab3:
+        with tab3:
+            st.header("All Submitted Picks")
+            
+            picks = load_picks()
+            results = load_results()
+            
+            if not picks:
+                st.info("No picks submitted yet.")
+            else:
+                for i, pick in enumerate(picks, 1):
+                    with st.expander(f"{pick['name']} - Submitted {pick['submitted_at'][:10]}"):
+                        # Display picks in organized sections
+                        pick_items = {k: v for k, v in pick.items() if k not in ['name', 'email', 'submitted_at', 'playing_for_money']}
+                        
+                        # Show playing for money status
+                        if pick.get('playing_for_money'):
+                            st.write(f"**Playing for Money:** {pick['playing_for_money']}")
+                            st.markdown("---")
+                        
+                        cols = st.columns(2)
+                        col_idx = 0
+                        for q_key, q_value in pick_items.items():
+                            if q_value is not None:
+                                question = next((q for q in questions if q['key'] == q_key), None)
+                                if question:
+                                    with cols[col_idx % 2]:
+                                        st.write(f"**{question['text']}**")
+                                        st.write(f"{q_value}")
+                                    col_idx += 1
+                        
+                        if results:
+                            score = calculate_score(pick, results, questions)
+                            st.metric("Current Score", f"{score} points")
+    else:
+        # Show message if picks are locked
+        st.info("🔒 Picks will be visible after 6pm EST on Sunday, February 8th, 2026")
 
 if __name__ == "__main__":
     main()
