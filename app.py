@@ -410,6 +410,26 @@ def save_counts(counts: Dict):
     with open(COUNTS_FILE, 'w') as f:
         json.dump(counts, f, indent=2)
 
+def check_answer_correct(pick_value: any, result_value: any, question_type: str) -> bool:
+    """Check if a single answer is correct"""
+    if pick_value is None or result_value is None:
+        return False
+    
+    if question_type == 'over_under':
+        return pick_value == result_value
+    elif question_type == 'yes_no':
+        return str(pick_value).lower() == str(result_value).lower()
+    elif question_type == 'select':
+        return str(pick_value).strip().lower() == str(result_value).strip().lower()
+    elif question_type == 'text':
+        return str(pick_value).strip().lower() == str(result_value).strip().lower()
+    elif question_type == 'number':
+        try:
+            return float(pick_value) == float(result_value)
+        except:
+            return False
+    return False
+
 def calculate_score(picks: Dict, results: Dict, questions: List[Dict]) -> int:
     """Calculate score based on picks vs results"""
     if not results:
@@ -1026,7 +1046,19 @@ def main():
                                 question = next((q for q in questions if q['key'] == q_key), None)
                                 if question:
                                     with cols[col_idx % 2]:
-                                        st.write(f"**{question['text']}**")
+                                        # Check if answer is correct (if results are available)
+                                        is_correct = None
+                                        if results and q_key in results and results[q_key] is not None:
+                                            is_correct = check_answer_correct(q_value, results[q_key], question['type'])
+                                        
+                                        # Display question with checkmark or X
+                                        if is_correct is True:
+                                            st.write(f"**{question['text']}** ✅")
+                                        elif is_correct is False:
+                                            st.write(f"**{question['text']}** ❌")
+                                        else:
+                                            st.write(f"**{question['text']}**")
+                                        
                                         st.write(f"{q_value}")
                                     col_idx += 1
                         
