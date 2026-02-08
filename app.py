@@ -770,7 +770,7 @@ def main():
         # Check if submissions are locked
         if not can_submit_picks():
             st.error("🔒 **Submissions are now closed!** Picks were locked at 6:30pm EST on Sunday, February 8th, 2026.")
-            st.stop()
+            st.info("You can still view the leaderboard and all picks below.")
         
         with st.form("picks_form"):
             col1, col2 = st.columns(2)
