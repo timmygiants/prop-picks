@@ -18,6 +18,7 @@ st.set_page_config(
 # Data files
 DATA_FILE = "picks.json"
 RESULTS_FILE = "results.json"
+COUNTS_FILE = "counts.json"
 QUESTIONS_FILE = "Super Bowl LX Picks.xlsx"
 QUESTIONS_TXT_FILE = "questions.txt"
 QUESTION_CONFIG_FILE = "question_config.json"
@@ -383,6 +384,23 @@ def save_results(results: Dict):
     """Save actual results to JSON file"""
     with open(RESULTS_FILE, 'w') as f:
         json.dump(results, f, indent=2)
+
+def load_counts() -> Dict:
+    """Load current counts from JSON file"""
+    if os.path.exists(COUNTS_FILE):
+        with open(COUNTS_FILE, 'r') as f:
+            return json.load(f)
+    return {
+        'dog_commercials': 0,
+        'covid_mask_commercials': 0,
+        'halftime_songs': 0,
+        'mahomes_kelce_mentions': 0
+    }
+
+def save_counts(counts: Dict):
+    """Save current counts to JSON file"""
+    with open(COUNTS_FILE, 'w') as f:
+        json.dump(counts, f, indent=2)
 
 def calculate_score(picks: Dict, results: Dict, questions: List[Dict]) -> int:
     """Calculate score based on picks vs results"""
