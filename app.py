@@ -775,34 +775,35 @@ def main():
         with st.form("picks_form"):
             col1, col2 = st.columns(2)
             
-            # Load existing picks when email is entered (check on form submit or when email changes)
-            existing_pick = None
-            if 'existing_pick_email' not in st.session_state:
-                st.session_state.existing_pick_email = None
-                st.session_state.existing_pick_data = None
+            # Check for existing picks - use session state to track
+            if 'check_email' not in st.session_state:
+                st.session_state.check_email = ""
             
             with col1:
-                # Pre-fill name if we have existing pick
-                name_default = ""
-                if st.session_state.existing_pick_data and st.session_state.existing_pick_data.get('name'):
-                    name_default = st.session_state.existing_pick_data.get('name', '')
-                name = st.text_input("Your Name *", value=name_default, placeholder="Enter your name", key="form_name")
+                name = st.text_input("Your Name *", placeholder="Enter your name", key="form_name")
             with col2:
-                email = st.text_input("Email *", placeholder="your.email@example.com", key="form_email", 
-                                     on_change=lambda: setattr(st.session_state, 'existing_pick_email', None))
+                email = st.text_input("Email *", placeholder="your.email@example.com", key="form_email")
             
-            # Check for existing picks when email is entered
-            if email and email != st.session_state.existing_pick_email:
+            # Load existing picks when email is entered
+            existing_pick = None
+            if email and email.lower() != st.session_state.check_email.lower():
                 existing_pick = get_pick_by_email(email)
                 if existing_pick:
-                    st.session_state.existing_pick_email = email
-                    st.session_state.existing_pick_data = existing_pick
+                    st.session_state.check_email = email.lower()
                     st.info(f"📝 Found existing picks for this email. You can edit them below. Changes will be saved when you submit.")
+                    # Pre-fill name
+                    if existing_pick.get('name'):
+                        # Update the name field via session state
+                        st.session_state.form_name = existing_pick.get('name', '')
                 else:
-                    st.session_state.existing_pick_email = email
-                    st.session_state.existing_pick_data = None
-            elif st.session_state.existing_pick_data:
-                existing_pick = st.session_state.existing_pick_data
+                    st.session_state.check_email = email.lower()
+            elif email:
+                # Re-check if email matches what we checked before
+                existing_pick = get_pick_by_email(email)
+            
+            # If we have existing pick, use its name
+            if existing_pick and existing_pick.get('name') and not name:
+                name = existing_pick.get('name', '')
             
             # Playing for money question
             playing_for_money_default = ""
