@@ -355,20 +355,20 @@ def get_est_time():
     return datetime.now(est), est
 
 def can_view_picks() -> bool:
-    """Check if current time is after 6pm EST on Sunday 2/8/2026"""
+    """Check if current time is after 6:30pm EST on Sunday 2/8/2026"""
     now, est = get_est_time()
     
-    # Target: 6pm EST on Sunday, February 8, 2026
-    target = datetime(2026, 2, 8, 18, 0, 0, tzinfo=est)
+    # Target: 6:30pm EST on Sunday, February 8, 2026
+    target = datetime(2026, 2, 8, 18, 30, 0, tzinfo=est)
     
     return now >= target
 
 def can_submit_picks() -> bool:
-    """Check if submissions are still open (before 6pm EST on Sunday 2/8/2026)"""
+    """Check if submissions are still open (before 6:30pm EST on Sunday 2/8/2026)"""
     now, est = get_est_time()
     
-    # Lock at 6pm EST on Sunday, February 8, 2026
-    lock_time = datetime(2026, 2, 8, 18, 0, 0, tzinfo=est)
+    # Lock at 6:30pm EST on Sunday, February 8, 2026
+    lock_time = datetime(2026, 2, 8, 18, 30, 0, tzinfo=est)
     
     return now < lock_time
 
@@ -614,7 +614,7 @@ def main():
         
         # Check if submissions are locked
         if not can_submit_picks():
-            st.error("🔒 **Submissions are now closed!** Picks were locked at 6pm EST on Sunday, February 8th, 2026.")
+            st.error("🔒 **Submissions are now closed!** Picks were locked at 6:30pm EST on Sunday, February 8th, 2026.")
             st.stop()
         
         with st.form("picks_form"):
