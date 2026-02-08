@@ -94,7 +94,8 @@ def parse_questions_txt() -> List[Dict]:
                 looks_like_question = (
                     '?' in lines[i] or
                     lines[i].startswith(('Who ', 'What ', 'Which ', 'Will ', 'How ', 'When ', 'Where ', 'Why ', 'At ')) or
-                    lines[i].startswith(('Seattle ', 'Total ', 'National ', 'First ', 'More ', 'Number ', 'Color ', 'Bad ', 'A commercial', 'From kick-off', 'TIE BREAKER', 'Would you', 'Did you', 'For auditing', 'If you win'))
+                    lines[i].startswith(('Seattle ', 'Total ', 'National ', 'First ', 'More ', 'Number ', 'Color ', 'Bad ', 'A commercial', 'From kick-off', 'TIE BREAKER', 'Would you', 'Did you', 'For auditing', 'If you win')) or
+                    ':' in lines[i] and ('Over/Under' in lines[i] or 'Passing' in lines[i] or 'Rushing' in lines[i] or 'Receptions' in lines[i] or 'Receiving' in lines[i] or 'Jersey' in lines[i] or 'Tackles' in lines[i])
                 )
                 
                 # If it looks like a question and we already have options, this is a new question
