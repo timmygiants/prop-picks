@@ -310,6 +310,14 @@ def load_picks() -> List[Dict]:
             return json.load(f)
     return []
 
+def get_pick_by_email(email: str) -> Optional[Dict]:
+    """Get existing pick by email address"""
+    picks = load_picks()
+    for pick in picks:
+        if pick.get('email', '').lower() == email.lower():
+            return pick
+    return None
+
 def save_picks(picks: List[Dict]):
     """Save picks to JSON file"""
     with open(DATA_FILE, 'w') as f:
@@ -463,7 +471,7 @@ def create_safe_key(text: str, prefix: str = "", index: int = None) -> str:
         key = f"{prefix}_{safe_text}_{text_hash}" if prefix else f"{safe_text}_{text_hash}"
     return key
 
-def render_question_input(question: Dict, key_prefix: str = "", index: int = None):
+def render_question_input(question: Dict, key_prefix: str = "", index: int = None, default_value: any = None):
     """Render appropriate input widget for a question"""
     q_key = question['key']
     q_text = question['text']
@@ -475,35 +483,50 @@ def render_question_input(question: Dict, key_prefix: str = "", index: int = Non
     
     if q_type == 'over_under':
         threshold = q_options[0] if q_options else 0
+        default_idx = 0
+        if default_value:
+            default_idx = 1 if default_value == "Over" else (2 if default_value == "Under" else 0)
         return st.selectbox(
             f"{q_text} *" if q_required else q_text,
             ["", "Over", "Under"],
+            index=default_idx,
             key=full_key
         )
     elif q_type == 'yes_no':
+        default_idx = 0
+        if default_value:
+            default_idx = 1 if default_value == "Yes" else (2 if default_value == "No" else 0)
         return st.selectbox(
             f"{q_text} *" if q_required else q_text,
             ["", "Yes", "No"],
+            index=default_idx,
             key=full_key
         )
     elif q_type == 'select':
         options = [""] + q_options
+        default_idx = 0
+        if default_value and default_value in options:
+            default_idx = options.index(default_value)
         return st.selectbox(
             f"{q_text} *" if q_required else q_text,
             options,
+            index=default_idx,
             key=full_key
         )
     elif q_type == 'number':
+        default_val = float(default_value) if default_value else 0.0
         return st.number_input(
             f"{q_text} *" if q_required else q_text,
             min_value=0.0,
-            value=0.0,
+            value=default_val,
             step=0.1,
             key=full_key
         )
     else:  # text
+        default_text = str(default_value) if default_value else ""
         return st.text_input(
             f"{q_text} *" if q_required else q_text,
+            value=default_text,
             key=full_key,
             placeholder="Enter your answer"
         )
@@ -753,15 +776,32 @@ def main():
             col1, col2 = st.columns(2)
             
             with col1:
-                name = st.text_input("Your Name *", placeholder="Enter your name")
+                name = st.text_input("Your Name *", placeholder="Enter your name", key="form_name")
             with col2:
-                email = st.text_input("Email *", placeholder="your.email@example.com")
+                email = st.text_input("Email *", placeholder="your.email@example.com", key="form_email")
+            
+            # Load existing picks when email is entered
+            existing_pick = None
+            if email:
+                existing_pick = get_pick_by_email(email)
+                if existing_pick:
+                    st.info(f"📝 Found existing picks for this email. You can edit them below. Changes will be saved when you submit.")
+                    # Pre-fill name if not already filled
+                    if not name and existing_pick.get('name'):
+                        st.session_state.form_name = existing_pick.get('name', '')
+                        name = existing_pick.get('name', '')
             
             # Playing for money question
+            playing_for_money_default = ""
+            if existing_pick and existing_pick.get('playing_for_money'):
+                playing_for_money_default = existing_pick.get('playing_for_money')
+            
             playing_for_money = st.selectbox(
                 "Are you playing for money? *",
                 ["", "Yes, I'm in the $20 pool", "No, just playing for fun"],
-                help="Select whether you're participating in the $20 charity pool or just playing for fun"
+                index=1 if playing_for_money_default == "Yes, I'm in the $20 pool" else (2 if playing_for_money_default == "No, just playing for fun" else 0),
+                help="Select whether you're participating in the $20 charity pool or just playing for fun",
+                key="form_playing_for_money"
             )
             
             st.markdown("### Prop Questions")
@@ -805,31 +845,36 @@ def main():
             if game_questions:
                 st.markdown("#### 🏈 Game Props")
                 for question in game_questions:
-                    pick_inputs[question['key']] = render_question_input(question, "pick", question_index)
+                    default_val = existing_pick.get(question['key']) if existing_pick else None
+                    pick_inputs[question['key']] = render_question_input(question, "pick", question_index, default_val)
                     question_index += 1
             
             if anthem_questions:
                 st.markdown("#### 🎤 National Anthem Props")
                 for question in anthem_questions:
-                    pick_inputs[question['key']] = render_question_input(question, "pick", question_index)
+                    default_val = existing_pick.get(question['key']) if existing_pick else None
+                    pick_inputs[question['key']] = render_question_input(question, "pick", question_index, default_val)
                     question_index += 1
             
             if commercial_questions:
                 st.markdown("#### 📺 Commercial Props")
                 for question in commercial_questions:
-                    pick_inputs[question['key']] = render_question_input(question, "pick", question_index)
+                    default_val = existing_pick.get(question['key']) if existing_pick else None
+                    pick_inputs[question['key']] = render_question_input(question, "pick", question_index, default_val)
                     question_index += 1
             
             if halftime_questions:
                 st.markdown("#### 🎵 Halftime Show Props")
                 for question in halftime_questions:
-                    pick_inputs[question['key']] = render_question_input(question, "pick", question_index)
+                    default_val = existing_pick.get(question['key']) if existing_pick else None
+                    pick_inputs[question['key']] = render_question_input(question, "pick", question_index, default_val)
                     question_index += 1
             
             if other_questions:
                 st.markdown("#### 📋 Other Props")
                 for question in other_questions:
-                    pick_inputs[question['key']] = render_question_input(question, "pick", question_index)
+                    default_val = existing_pick.get(question['key']) if existing_pick else None
+                    pick_inputs[question['key']] = render_question_input(question, "pick", question_index, default_val)
                     question_index += 1
             
             submitted = st.form_submit_button("Submit Picks", type="primary")
