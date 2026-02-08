@@ -543,6 +543,120 @@ def main():
                             )
                         st.success(f"Exported {len(picks)} picks to Excel!")
             
+            # Live Counting Interface
+            if st.checkbox("📊 Live Counting Tools"):
+                st.subheader("Real-Time Counters")
+                st.markdown("Use these counters during the game to track counting questions.")
+                
+                counts = load_counts()
+                
+                # Dog Commercials Counter
+                col1, col2, col3 = st.columns([2, 1, 1])
+                with col1:
+                    st.markdown(f"### 🐕 Dog Commercials")
+                    st.markdown(f"**Current Count: {counts['dog_commercials']}**")
+                with col2:
+                    if st.button("➕", key="dog_inc", use_container_width=True):
+                        counts['dog_commercials'] += 1
+                        save_counts(counts)
+                        st.rerun()
+                with col3:
+                    if st.button("➖", key="dog_dec", use_container_width=True):
+                        counts['dog_commercials'] = max(0, counts['dog_commercials'] - 1)
+                        save_counts(counts)
+                        st.rerun()
+                
+                # COVID Mask Commercials Counter
+                col1, col2, col3 = st.columns([2, 1, 1])
+                with col1:
+                    st.markdown(f"### 😷 COVID Mask Commercials")
+                    st.markdown(f"**Current Count: {counts['covid_mask_commercials']}**")
+                with col2:
+                    if st.button("➕", key="covid_inc", use_container_width=True):
+                        counts['covid_mask_commercials'] += 1
+                        save_counts(counts)
+                        st.rerun()
+                with col3:
+                    if st.button("➖", key="covid_dec", use_container_width=True):
+                        counts['covid_mask_commercials'] = max(0, counts['covid_mask_commercials'] - 1)
+                        save_counts(counts)
+                        st.rerun()
+                
+                # Halftime Songs Counter
+                col1, col2, col3 = st.columns([2, 1, 1])
+                with col1:
+                    st.markdown(f"### 🎵 Halftime Songs")
+                    st.markdown(f"**Current Count: {counts['halftime_songs']}**")
+                with col2:
+                    if st.button("➕", key="songs_inc", use_container_width=True):
+                        counts['halftime_songs'] += 1
+                        save_counts(counts)
+                        st.rerun()
+                with col3:
+                    if st.button("➖", key="songs_dec", use_container_width=True):
+                        counts['halftime_songs'] = max(0, counts['halftime_songs'] - 1)
+                        save_counts(counts)
+                        st.rerun()
+                
+                # Mahomes/Kelce Mentions Counter
+                col1, col2, col3 = st.columns([2, 1, 1])
+                with col1:
+                    st.markdown(f"### 🏈 Mahomes & Kelce Mentions")
+                    st.markdown(f"**Current Count: {counts['mahomes_kelce_mentions']}**")
+                with col2:
+                    if st.button("➕", key="mentions_inc", use_container_width=True):
+                        counts['mahomes_kelce_mentions'] += 1
+                        save_counts(counts)
+                        st.rerun()
+                with col3:
+                    if st.button("➖", key="mentions_dec", use_container_width=True):
+                        counts['mahomes_kelce_mentions'] = max(0, counts['mahomes_kelce_mentions'] - 1)
+                        save_counts(counts)
+                        st.rerun()
+                
+                st.markdown("---")
+                
+                # Button to apply counts to results
+                if st.button("✅ Apply Counts to Results", type="primary"):
+                    results = load_results()
+                    counts = load_counts()
+                    
+                    # Map counts to question keys
+                    question_mapping = {
+                        'dog_commercials': 'Number of commercials with dogs: Over/Under 7.5 (from kick-off to end of regulation - does not include animated dogs or costumes)',
+                        'covid_mask_commercials': 'How many commercials will have some one wearing a COVID mask? Over/Under 1.5 (from kick-off to end of regulation)',
+                        'halftime_songs': 'Total Songs during Halftime Show: Over/Under 10.5',
+                        'mahomes_kelce_mentions': 'Total Number of Mentions of Patrick Mahomes AND Travis Kelce: Over/Under 1.5'
+                    }
+                    
+                    thresholds = {
+                        'dog_commercials': 7.5,
+                        'covid_mask_commercials': 1.5,
+                        'halftime_songs': 10.5,
+                        'mahomes_kelce_mentions': 1.5
+                    }
+                    
+                    for count_key, question_key in question_mapping.items():
+                        count = counts[count_key]
+                        threshold = thresholds[count_key]
+                        result = "Over" if count > threshold else "Under"
+                        results[question_key] = result
+                    
+                    save_results(results)
+                    st.success(f"✅ Applied counts to results! (Dog: {counts['dog_commercials']}, COVID: {counts['covid_mask_commercials']}, Songs: {counts['halftime_songs']}, Mentions: {counts['mahomes_kelce_mentions']})")
+                    st.rerun()
+                
+                if st.button("🔄 Reset All Counters"):
+                    counts = {
+                        'dog_commercials': 0,
+                        'covid_mask_commercials': 0,
+                        'halftime_songs': 0,
+                        'mahomes_kelce_mentions': 0
+                    }
+                    save_counts(counts)
+                    st.success("All counters reset!")
+                    st.rerun()
+            
             if st.checkbox("Enter Results (Admin Only)"):
                 st.subheader("Enter Actual Results")
                 results = load_results()
