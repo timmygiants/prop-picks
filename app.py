@@ -853,22 +853,34 @@ def main():
                     else:
                         picks = load_picks()
                         
-                        # Check if email already exists
-                        if any(p['email'].lower() == email.lower() for p in picks):
-                            st.error("This email has already submitted picks!")
+                        # Clean up empty values
+                        cleaned_picks = {k: v if v != "" else None for k, v in pick_inputs.items()}
+                        
+                        # Check if email already exists - if so, update existing entry
+                        existing_index = None
+                        for idx, p in enumerate(picks):
+                            if p['email'].lower() == email.lower():
+                                existing_index = idx
+                                break
+                        
+                        updated_pick = {
+                            'name': name,
+                            'email': email.lower(),
+                            'playing_for_money': playing_for_money if playing_for_money else None,
+                            **cleaned_picks,
+                            'submitted_at': datetime.now().isoformat()
+                        }
+                        
+                        if existing_index is not None:
+                            # Update existing entry
+                            picks[existing_index] = updated_pick
+                            save_picks(picks)
+                            st.session_state.submitted = True
+                            st.success(f"✅ Picks updated successfully, {name}! Your previous submission has been replaced.")
+                            st.balloons()
                         else:
-                            # Clean up empty values
-                            cleaned_picks = {k: v if v != "" else None for k, v in pick_inputs.items()}
-                            
-                            new_pick = {
-                                'name': name,
-                                'email': email.lower(),
-                                'playing_for_money': playing_for_money if playing_for_money else None,
-                                **cleaned_picks,
-                                'submitted_at': datetime.now().isoformat()
-                            }
-                            
-                            picks.append(new_pick)
+                            # New submission
+                            picks.append(updated_pick)
                             save_picks(picks)
                             st.session_state.submitted = True
                             st.success(f"✅ Picks submitted successfully, {name}!")
