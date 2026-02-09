@@ -990,8 +990,12 @@ def main():
             # Display leaderboard
             df = pd.DataFrame(leaderboard_data)
             
+            # Count how many questions have results
+            questions_with_results = sum(1 for q in questions if q['key'] in results and results[q['key']] is not None)
+            total_questions = len(questions)
+            
             if results:
-                st.success("✅ Results have been entered! Scores are now live.")
+                st.success(f"✅ Results have been entered! Scores are now live. ({questions_with_results} of {total_questions} questions scored)")
             else:
                 st.info("⏳ Waiting for results to be entered. Scores will update automatically.")
             
